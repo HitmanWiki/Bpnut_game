@@ -28,6 +28,15 @@ const config = {
             debug: false,
         },
     },
+    plugins: {
+        scene: [
+            {
+                key: 'rexvirtualjoystickplugin',
+                plugin: window.rexvirtualjoystickplugin,
+                mapping: 'rexVirtualJoystick', // Adds joystick to the scene
+            },
+        ],
+    },
     scene: {
         preload: preload,
         create: create,
@@ -51,7 +60,6 @@ function preload() {
     this.load.image("powerup", "assets/powerup_acorn.png");
     this.load.image("monster", "assets/monster.png");
 
-    // Load sounds
     this.load.audio("jump", "assets/sounds/jump.wav");
     this.load.audio("collect", "assets/sounds/collect.mp3");
     this.load.audio("hit", "assets/sounds/hit.wav");
@@ -90,7 +98,7 @@ function create() {
     this.scoreText = this.add.text(10, 10, "Score: 0", { fontSize: "20px", fill: "#fff" });
 
     // Add virtual joystick for mobile
-    this.joystick = this.plugins.get("rexvirtualjoystickplugin").add(this, {
+    this.joystick = this.rexVirtualJoystick.add(this, {
         x: 100,
         y: window.innerHeight - 100,
         radius: 50,
