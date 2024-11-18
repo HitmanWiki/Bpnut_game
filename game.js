@@ -3,10 +3,22 @@ const tg = window.Telegram ? window.Telegram.WebApp : null;
 
 if (tg) {
     tg.ready(); // Initialize Telegram WebApp
+    console.log("Telegram WebApp API initialized");
+
+    // Example: Set Main Button text and show it
+    tg.MainButton.text = "End Game";
+    tg.MainButton.show();
+
+    // Example: Handle Main Button click
+    tg.MainButton.onClick(() => {
+        tg.sendData(JSON.stringify({ score: gameScene.score }));
+        tg.MainButton.hide();
+    });
 } else {
     console.warn("Telegram WebApp API not found. Running in a non-Telegram context.");
 }
 
+// Phaser Game Configuration
 const config = {
     type: Phaser.AUTO,
     width: 800,
@@ -27,6 +39,10 @@ const config = {
 };
 
 const game = new Phaser.Game(config);
+
+let gameScene = {
+    score: 0,
+};
 
 function preload() {
     // Load assets
@@ -74,15 +90,11 @@ function create() {
     this.babypnut = this.physics.add.sprite(100, 300, "squirrel");
     this.babypnut.setCollideWorldBounds(true);
 
-    // Play "run" animation if it exists
-    if (this.anims.exists("run")) {
-        this.babypnut.play("run");
-    } else {
-        console.error("Run animation not found! Check the sprite sheet or animation setup.");
-    }
+    // Play "run" animation
+    this.babypnut.play("run");
 
     // Add score text
-    this.score = 0;
+    gameScene.score = 0;
     this.scoreText = this.add.text(10, 10, "Score: 0", { fontSize: "20px", fill: "#fff" });
 
     // Add keyboard controls
@@ -138,18 +150,6 @@ function create() {
     this.physics.add.collider(this.babypnut, this.obstacles, hitObstacle, null, this);
     this.physics.add.overlap(this.babypnut, this.powerups, collectPowerup, null, this);
     this.physics.add.collider(this.babypnut, this.monsters, hitMonster, null, this);
-
-    // Add Telegram button
-    if (tg) {
-        const endGameButton = this.add.text(650, 550, "End Game", { fontSize: "20px", fill: "#fff" });
-        endGameButton.setInteractive();
-        endGameButton.on("pointerdown", () => {
-            tg.sendData(JSON.stringify({ score: this.score }));
-        });
-    }
-
-    // Sound flag
-    this.isJumping = false;
 }
 
 function update() {
@@ -159,26 +159,17 @@ function update() {
     // Control squirrel movement
     if (this.cursors.up.isDown) {
         this.babypnut.setVelocityY(-200);
-        if (!this.isJumping) {
-            this.sound.play("jump");
-            this.isJumping = true;
-        }
-        if (this.anims.exists("jump")) {
-            this.babypnut.play("jump", true);
-        }
+        this.babypnut.play("jump", true);
     } else {
-        this.isJumping = false;
-        if (this.anims.exists("run")) {
-            this.babypnut.play("run", true);
-        }
+        this.babypnut.play("run", true);
     }
 }
 
 function collectCoin(player, coin) {
     coin.destroy();
     this.sound.play("collect");
-    this.score += 10; // Increment score
-    this.scoreText.setText("Score: " + this.score);
+    gameScene.score += 10; // Increment score
+    this.scoreText.setText("Score: " + gameScene.score);
 }
 
 function hitObstacle(player, obstacle) {
@@ -186,6 +177,11 @@ function hitObstacle(player, obstacle) {
     this.babypnut.setTint(0xff0000); // Change character color to red
     this.sound.play("hit");
     this.add.text(300, 250, "Game Over!", { fontSize: "40px", fill: "#fff" });
+
+    if (tg) {
+        tg.MainButton.text = "Restart Game";
+        tg.MainButton.show();
+    }
 }
 
 function collectPowerup(player, powerup) {
@@ -200,6 +196,11 @@ function collectPowerup(player, powerup) {
 function hitMonster(player, monster) {
     this.physics.pause(); // Stop all game physics
     this.babypnut.setTint(0xff0000); // Turn squirrel red
-    this.sound.play("hit"); // Play hit sound
+    this.sound.play("hit");
     this.add.text(300, 250, "Game Over!", { fontSize: "40px", fill: "#fff" });
+
+    if (tg) {
+        tg.MainButton.text = "Restart Game";
+        tg.MainButton.show();
+    }
 }
