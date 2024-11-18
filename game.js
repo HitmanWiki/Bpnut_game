@@ -5,14 +5,11 @@ if (tg) {
     tg.ready(); // Initialize Telegram WebApp
     console.log("Telegram WebApp API initialized");
 
-    // Example: Set Main Button text and show it
-    tg.MainButton.text = "End Game";
+    // Main Button to restart or submit data
+    tg.MainButton.text = "Restart Game";
     tg.MainButton.show();
-
-    // Example: Handle Main Button click
     tg.MainButton.onClick(() => {
-        tg.sendData(JSON.stringify({ score: gameScene.score }));
-        tg.MainButton.hide();
+        location.reload(); // Restart game
     });
 } else {
     console.warn("Telegram WebApp API not found. Running in a non-Telegram context.");
@@ -21,8 +18,8 @@ if (tg) {
 // Phaser Game Configuration
 const config = {
     type: Phaser.AUTO,
-    width: 800,
-    height: 600,
+    width: window.innerWidth,
+    height: window.innerHeight,
     backgroundColor: "#88CFFA",
     physics: {
         default: "arcade",
@@ -40,9 +37,7 @@ const config = {
 
 const game = new Phaser.Game(config);
 
-let gameScene = {
-    score: 0,
-};
+let score = 0; // Initialize score variable
 
 function preload() {
     // Load assets
@@ -54,14 +49,14 @@ function preload() {
     this.load.image("coin", "assets/coin.png");
     this.load.image("obstacle", "assets/obstacle.png");
     this.load.image("powerup", "assets/powerup_acorn.png");
-    this.load.image("monster", "assets/cartoon_monster_enemy.png");
+    this.load.image("monster", "assets/monster.png");
 
     // Load sounds
     this.load.audio("jump", "assets/sounds/jump.wav");
     this.load.audio("collect", "assets/sounds/collect.mp3");
     this.load.audio("hit", "assets/sounds/hit.wav");
 
-    // Debug loading errors
+    // Handle asset loading errors
     this.load.on("fileerror", (file) => {
         console.error(`Error loading file: ${file.key} (${file.url})`);
     });
@@ -69,7 +64,11 @@ function preload() {
 
 function create() {
     // Add scrolling background
-    this.background = this.add.tileSprite(400, 300, 800, 600, "background");
+    this.background = this.add.tileSprite(400, 300, window.innerWidth, window.innerHeight, "background");
+
+    // Add the squirrel character
+    this.babypnut = this.physics.add.sprite(100, 300, "squirrel");
+    this.babypnut.setCollideWorldBounds(true);
 
     // Add animations
     this.anims.create({
@@ -78,7 +77,6 @@ function create() {
         frameRate: 10,
         repeat: -1,
     });
-
     this.anims.create({
         key: "jump",
         frames: this.anims.generateFrameNumbers("squirrel", { start: 4, end: 6 }),
@@ -86,19 +84,28 @@ function create() {
         repeat: -1,
     });
 
-    // Add squirrel character
-    this.babypnut = this.physics.add.sprite(100, 300, "squirrel");
-    this.babypnut.setCollideWorldBounds(true);
-
-    // Play "run" animation
     this.babypnut.play("run");
 
     // Add score text
-    gameScene.score = 0;
     this.scoreText = this.add.text(10, 10, "Score: 0", { fontSize: "20px", fill: "#fff" });
 
-    // Add keyboard controls
-    this.cursors = this.input.keyboard.createCursorKeys();
+    // Add virtual joystick for mobile
+    this.joystick = this.plugins.get("rexvirtualjoystickplugin").add(this, {
+        x: 100,
+        y: window.innerHeight - 100,
+        radius: 50,
+        base: this.add.circle(0, 0, 50, 0x888888),
+        thumb: this.add.circle(0, 0, 25, 0xcccccc),
+    });
+
+    // Handle joystick movement
+    this.joystick.on("update", () => {
+        const cursorKeys = this.joystick.createCursorKeys();
+        if (cursorKeys.up.isDown) this.babypnut.setVelocityY(-200);
+        if (cursorKeys.down.isDown) this.babypnut.setVelocityY(200);
+        if (cursorKeys.left.isDown) this.babypnut.setVelocityX(-200);
+        if (cursorKeys.right.isDown) this.babypnut.setVelocityX(200);
+    });
 
     // Add coin group
     this.coins = this.physics.add.group();
@@ -111,7 +118,7 @@ function create() {
         loop: true,
     });
 
-    // Add obstacle group
+    // Add obstacles
     this.obstacles = this.physics.add.group();
     this.time.addEvent({
         delay: 1500,
@@ -122,80 +129,35 @@ function create() {
         loop: true,
     });
 
-    // Add power-ups
-    this.powerups = this.physics.add.group();
-    this.time.addEvent({
-        delay: 5000,
-        callback: () => {
-            const powerup = this.powerups.create(800, Phaser.Math.Between(50, 550), "powerup");
-            powerup.setVelocityX(-150);
-        },
-        loop: true,
-    });
-
-    // Add monster enemies
-    this.monsters = this.physics.add.group();
-    this.time.addEvent({
-        delay: 7000,
-        callback: () => {
-            const monster = this.monsters.create(800, Phaser.Math.Between(50, 550), "monster");
-            monster.setVelocityX(-150);
-            monster.setScale(0.8);
-        },
-        loop: true,
-    });
-
-    // Collision detection
+    // Add collision detection
     this.physics.add.overlap(this.babypnut, this.coins, collectCoin, null, this);
     this.physics.add.collider(this.babypnut, this.obstacles, hitObstacle, null, this);
-    this.physics.add.overlap(this.babypnut, this.powerups, collectPowerup, null, this);
-    this.physics.add.collider(this.babypnut, this.monsters, hitMonster, null, this);
+
+    // Add Telegram button to submit score
+    if (tg) {
+        tg.MainButton.text = "Submit Score";
+        tg.MainButton.show();
+        tg.MainButton.onClick(() => {
+            tg.sendData(JSON.stringify({ score }));
+        });
+    }
 }
 
 function update() {
     // Scroll background
     this.background.tilePositionX += 5;
-
-    // Control squirrel movement
-    if (this.cursors.up.isDown) {
-        this.babypnut.setVelocityY(-200);
-        this.babypnut.play("jump", true);
-    } else {
-        this.babypnut.play("run", true);
-    }
 }
 
 function collectCoin(player, coin) {
     coin.destroy();
     this.sound.play("collect");
-    gameScene.score += 10; // Increment score
-    this.scoreText.setText("Score: " + gameScene.score);
+    score += 10; // Increment score
+    this.scoreText.setText("Score: " + score);
 }
 
 function hitObstacle(player, obstacle) {
     this.physics.pause(); // Stop all movements
     this.babypnut.setTint(0xff0000); // Change character color to red
-    this.sound.play("hit");
-    this.add.text(300, 250, "Game Over!", { fontSize: "40px", fill: "#fff" });
-
-    if (tg) {
-        tg.MainButton.text = "Restart Game";
-        tg.MainButton.show();
-    }
-}
-
-function collectPowerup(player, powerup) {
-    powerup.destroy();
-    this.babypnut.setTint(0x00ff00); // Temporary color change for effect
-    this.sound.play("collect");
-    this.time.delayedCall(3000, () => {
-        this.babypnut.clearTint(); // Revert after 3 seconds
-    });
-}
-
-function hitMonster(player, monster) {
-    this.physics.pause(); // Stop all game physics
-    this.babypnut.setTint(0xff0000); // Turn squirrel red
     this.sound.play("hit");
     this.add.text(300, 250, "Game Over!", { fontSize: "40px", fill: "#fff" });
 
